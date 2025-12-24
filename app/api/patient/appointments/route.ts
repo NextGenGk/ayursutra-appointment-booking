@@ -3,6 +3,8 @@ import { createServerClient } from '@/lib/supabase/server';
 import { getPatientSession } from '@/lib/utils/session';
 import { generateTokenNumber } from '@/lib/utils/token';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
     try {
         const session = await getPatientSession();

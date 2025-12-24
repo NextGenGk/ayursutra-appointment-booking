@@ -3,6 +3,8 @@ import { createServerClient } from '@/lib/supabase/server';
 import { getDoctorSession } from '@/lib/utils/session';
 import { getTodayDate } from '@/lib/utils/date';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
     try {
         const session = await getDoctorSession();
