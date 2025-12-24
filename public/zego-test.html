@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZEGO UI Kit Test</title>
+    <style>
+        #root {
+            width: 100vw;
+            height: 100vh;
+            background-color: #1a1a1a;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            color: white;
+            flex-direction: column;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #10B981;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="root">
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>Loading ZEGO UI Kit...</p>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/@zegocloud/zego-uikit-prebuilt/zego-uikit-prebuilt.js"></script>
+    <script>
+        window.onload = function () {
+            console.log('Page loaded, initializing ZEGO...');
+            
+            function getUrlParams(url) {
+                let urlStr = url.split('?')[1];
+                if (!urlStr) return {};
+                const urlSearchParams = new URLSearchParams(urlStr);
+                const result = Object.fromEntries(urlSearchParams.entries());
+                return result;
+            }
+
+            // Get parameters from URL or use defaults
+            const params = getUrlParams(window.location.href);
+            const roomID = params['roomID'] || 'test_room_' + Math.floor(Math.random() * 10000);
+            const userID = params['userID'] || 'user_' + Math.floor(Math.random() * 10000);
+            const userName = params['userName'] || 'Test User';
+            
+            console.log('Room ID:', roomID);
+            console.log('User ID:', userID);
+            console.log('User Name:', userName);
+
+            // ZEGO configuration
+            const appID = 1200963791;
+            const serverSecret = "efa1221bda70ba86f1124cff9bed296c";
+
+            try {
+                // Generate kit token
+                const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
+                    appID, 
+                    serverSecret, 
+                    roomID, 
+                    userID, 
+                    userName
+                );
+                
+                console.log('Kit token generated successfully');
+
+                // Create ZEGO instance
+                const zp = ZegoUIKitPrebuilt.create(kitToken);
+                console.log('ZEGO instance created');
+
+                // Join room
+                zp.joinRoom({
+                    container: document.querySelector("#root"),
+                    sharedLinks: [{
+                        name: 'Personal link',
+                        url: window.location.protocol + '//' + window.location.host + window.location.pathname + '?roomID=' + roomID,
+                    }],
+                    scenario: {
+                        mode: ZegoUIKitPrebuilt.VideoConference,
+                    },
+                    turnOnMicrophoneWhenJoining: true,
+                    turnOnCameraWhenJoining: true,
+                    showMyCameraToggleButton: true,
+                    showMyMicrophoneToggleButton: true,
+                    showAudioVideoSettingsButton: true,
+                    showScreenSharingButton: true,
+                    showTextChat: true,
+                    showUserList: true,
+                    maxUsers: 2,
+                    layout: "Auto",
+                    showLayoutButton: false,
+                    onJoinRoom: () => {
+                        console.log('Successfully joined room');
+                    },
+                    onLeaveRoom: () => {
+                        console.log('Left room');
+                    },
+                    onUserJoin: (users) => {
+                        console.log('User joined:', users);
+                    },
+                    onUserLeave: (users) => {
+                        console.log('User left:', users);
+                    }
+                });
+
+                console.log('ZEGO UI Kit initialized successfully');
+
+            } catch (error) {
+                console.error('Error initializing ZEGO UI Kit:', error);
+                document.querySelector("#root").innerHTML = `
+                    <div class="loading">
+                        <h2 style="color: red;">Error</h2>
+                        <p>Failed to initialize video call: ${error.message}</p>
+                        <button onclick="location.reload()" style="padding: 10px 20px; background: #10B981; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                            Retry
+                        </button>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
