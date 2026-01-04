@@ -39,9 +39,45 @@ export async function PUT(
             );
         }
 
+        // Fetch patient details for the appointment
+        const { data: patient, error: patientError } = await supabase
+            .from('patients')
+            .select('pid, uid, gender, date_of_birth, blood_group, allergies, chronic_conditions')
+            .eq('pid', appointment.pid)
+            .single();
+
+        if (patientError) {
+            console.error('Error fetching patient:', patientError);
+        }
+
+        // Fetch user details for patient
+        let user = null;
+        if (patient) {
+            const { data: userData, error: userError } = await supabase
+                .from('users')
+                .select('uid, name, email, phone, profile_image_url')
+                .eq('uid', patient.uid)
+                .single();
+
+            if (userError) {
+                console.error('Error fetching user:', userError);
+            } else {
+                user = userData;
+            }
+        }
+
+        // Return appointment with patient data
+        const appointmentWithPatient = {
+            ...appointment,
+            patient: patient ? {
+                ...patient,
+                user: user || null
+            } : null
+        };
+
         return NextResponse.json({
             success: true,
-            data: appointment,
+            data: appointmentWithPatient,
         });
     } catch (error) {
         console.error('Approve appointment error:', error);

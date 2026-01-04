@@ -42,19 +42,63 @@ export async function GET(request: NextRequest) {
             .order('scheduled_date', { ascending: true })
             .order('scheduled_time', { ascending: true });
 
-        const { data: appointments, error } = await query;
+        const { data: appointments, error: appointmentsError } = await query;
 
-        if (error) {
-            console.error('Error fetching appointments:', error);
+        if (appointmentsError) {
+            console.error('Error fetching appointments:', appointmentsError);
             return NextResponse.json(
                 { success: false, error: 'Failed to fetch appointments' },
                 { status: 500 }
             );
         }
 
+        if (!appointments || appointments.length === 0) {
+            return NextResponse.json({
+                success: true,
+                data: [],
+            });
+        }
+
+        // Fetch patient details for all appointments
+        const patientIds = Array.from(new Set(appointments.map(apt => apt.pid).filter(Boolean)));
+        
+        const { data: patients, error: patientsError } = await supabase
+            .from('patients')
+            .select('pid, uid, gender, date_of_birth, blood_group, allergies, chronic_conditions')
+            .in('pid', patientIds);
+
+        if (patientsError) {
+            console.error('Error fetching patients:', patientsError);
+        }
+
+        // Fetch user details for patients
+        const patientUids = patients?.map(p => p.uid).filter(Boolean) || [];
+        const { data: users, error: usersError } = await supabase
+            .from('users')
+            .select('uid, name, email, phone, profile_image_url')
+            .in('uid', patientUids);
+
+        if (usersError) {
+            console.error('Error fetching users:', usersError);
+        }
+
+        // Manually join the data
+        const appointmentsWithPatients = appointments.map(appointment => {
+            const patient = patients?.find(p => p.pid === appointment.pid);
+            const user = patient ? users?.find(u => u.uid === patient.uid) : null;
+            
+            return {
+                ...appointment,
+                patient: patient ? {
+                    ...patient,
+                    user: user || null
+                } : null
+            };
+        });
+
         return NextResponse.json({
             success: true,
-            data: appointments || [],
+            data: appointmentsWithPatients,
         });
     } catch (error) {
         console.error('Get doctor appointments error:', error);

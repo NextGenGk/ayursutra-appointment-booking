@@ -35,6 +35,13 @@ const statusColors: Record<string, string> = {
     cancelled: 'cancelled-soft',
 };
 
+function calculateAge(dob: string): number {
+    const birthDate = new Date(dob);
+    const ageDifMs = Date.now() - birthDate.getTime();
+    const ageDate = new Date(ageDifMs);
+    return Math.abs(ageDate.getUTCFullYear() - 1970);
+}
+
 export function AppointmentCard({
     appointment,
     viewType,
@@ -60,12 +67,14 @@ export function AppointmentCard({
                         <h3 className="font-semibold text-lg flex items-center gap-2">
                             <User className="w-4 h-4" />
                             {viewType === 'patient' && appointment.doctor
-                                ? `Dr. ${appointment.doctor.user.name}`
-                                : appointment.patient_name}
+                                ? `Dr. ${appointment.doctor.user?.name || 'Unknown'}`
+                                : appointment.patient?.user?.name || 'Unknown Patient'}
                         </h3>
-                        {viewType === 'doctor' && (
+                        {viewType === 'doctor' && appointment.patient && (
                             <p className="text-sm text-muted-foreground">
-                                Age: {appointment.patient_age} years
+                                {appointment.patient.date_of_birth 
+                                    ? `Age: ${calculateAge(appointment.patient.date_of_birth)} years`
+                                    : 'Age: N/A'}
                             </p>
                         )}
                     </div>
@@ -116,6 +125,18 @@ export function AppointmentCard({
             </CardContent>
 
             <CardFooter className="flex flex-wrap gap-2">
+                {/* Debug logging */}
+                {(() => {
+                    console.log('Appointment Card Debug:', {
+                        aid: appointment.aid,
+                        viewType,
+                        status: appointment.status,
+                        hasOnApprove: !!onApprove,
+                        shouldShowApprove: viewType === 'doctor' && appointment.status === 'scheduled'
+                    });
+                    return null;
+                })()}
+                
                 {/* Doctor Actions */}
                 {viewType === 'doctor' && appointment.status === 'scheduled' && (
                     <>

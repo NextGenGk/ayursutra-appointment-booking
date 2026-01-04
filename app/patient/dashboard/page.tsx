@@ -5,11 +5,14 @@ import { useRouter } from 'next/navigation';
 import { DoctorCard } from '@/components/doctor-card';
 import { AppointmentCard } from '@/components/appointment-card';
 import { BookingModal } from '@/components/booking-modal';
+import { AIDoctorSearch } from '@/components/ai-doctor-search';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DoctorWithUser, AppointmentWithDetails } from '@/types/database';
 import { useRealtimeAppointments } from '@/hooks/use-realtime-appointments';
-import { LogOut, Calendar } from 'lucide-react';
+import { LogOut, Calendar, Search, Users } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
+import config from '@/lib/config';
 
 export default function PatientDashboard() {
     const router = useRouter();
@@ -30,7 +33,7 @@ export default function PatientDashboard() {
         const fetchData = async () => {
             try {
                 // Fetch doctors
-                const doctorsRes = await fetch('/api/patient/doctors');
+                const doctorsRes = await fetch(config.getApiUrl('api/patient/doctors'));
                 const doctorsData = await doctorsRes.json();
 
                 if (doctorsData.success) {
@@ -38,15 +41,23 @@ export default function PatientDashboard() {
                 }
 
                 // Fetch appointments
-                const appointmentsRes = await fetch('/api/patient/appointments');
+                const appointmentsRes = await fetch(config.getApiUrl('api/patient/appointments'));
                 const appointmentsData = await appointmentsRes.json();
+
+                console.log('Patient Appointments Response:', appointmentsData);
+                console.log('Appointments Data:', appointmentsData.data);
+                console.log('Number of appointments:', appointmentsData.data?.length || 0);
 
                 if (appointmentsData.success) {
                     setAppointments(appointmentsData.data);
+                    console.log('Appointments set:', appointmentsData.data);
                     // Extract patient ID from first appointment if available
                     if (appointmentsData.data.length > 0) {
                         setPatientId(appointmentsData.data[0].pid);
+                        console.log('Patient ID:', appointmentsData.data[0].pid);
                     }
+                } else {
+                    console.error('Failed to fetch appointments:', appointmentsData.error);
                 }
             } catch (error) {
                 console.error('Error fetching data:', error);
@@ -90,7 +101,7 @@ export default function PatientDashboard() {
 
     const handleSubmitBooking = async (data: any) => {
         try {
-            const response = await fetch('/api/patient/appointments', {
+            const response = await fetch(config.getApiUrl('api/patient/appointments'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
@@ -100,7 +111,7 @@ export default function PatientDashboard() {
 
             if (result.success) {
                 // Refresh appointments
-                const appointmentsRes = await fetch('/api/patient/appointments');
+                const appointmentsRes = await fetch(config.getApiUrl('api/patient/appointments'));
                 const appointmentsData = await appointmentsRes.json();
                 if (appointmentsData.success) {
                     setAppointments(appointmentsData.data);
@@ -118,7 +129,7 @@ export default function PatientDashboard() {
     };
 
     const handleLogout = async () => {
-        await fetch('/api/auth/logout', { method: 'POST' });
+        await fetch(config.getApiUrl('api/auth/logout'), { method: 'POST' });
         router.push('/');
     };
 
@@ -157,6 +168,14 @@ export default function PatientDashboard() {
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 {/* My Appointments Section */}
+                {(() => {
+                    const activeAppointments = appointments.filter(apt => apt.status !== 'completed');
+                    console.log('Total appointments:', appointments.length);
+                    console.log('Active appointments (not completed):', activeAppointments.length);
+                    console.log('Appointments:', appointments);
+                    return null;
+                })()}
+                
                 {appointments.filter(apt => apt.status !== 'completed').length > 0 && (
                     <section className="mb-12">
                         <div className="flex items-center gap-2 mb-6">
@@ -178,24 +197,43 @@ export default function PatientDashboard() {
                     </section>
                 )}
 
-                {/* Available Doctors Section */}
+                {/* Doctor Search and Browse Section */}
                 <section>
-                    <h2 className="text-2xl font-bold mb-6">Available Doctors</h2>
-                    {doctors.length === 0 ? (
-                        <div className="text-center py-12 bg-white rounded-lg border">
-                            <p className="text-muted-foreground">No doctors available at the moment</p>
-                        </div>
-                    ) : (
-                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {doctors.map((doctor) => (
-                                <DoctorCard
-                                    key={doctor.did}
-                                    doctor={doctor}
-                                    onBookAppointment={handleBookAppointment}
-                                />
-                            ))}
-                        </div>
-                    )}
+                    <Tabs defaultValue="ai-search" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="ai-search" className="flex items-center gap-2">
+                                <Search className="w-4 h-4" />
+                                AI Doctor Search
+                            </TabsTrigger>
+                            <TabsTrigger value="browse-all" className="flex items-center gap-2">
+                                <Users className="w-4 h-4" />
+                                Browse All Doctors
+                            </TabsTrigger>
+                        </TabsList>
+                        
+                        <TabsContent value="ai-search" className="mt-6">
+                            <AIDoctorSearch onBookAppointment={handleBookAppointment} />
+                        </TabsContent>
+                        
+                        <TabsContent value="browse-all" className="mt-6">
+                            <h2 className="text-2xl font-bold mb-6">All Available Doctors</h2>
+                            {doctors.length === 0 ? (
+                                <div className="text-center py-12 bg-white rounded-lg border">
+                                    <p className="text-muted-foreground">No doctors available at the moment</p>
+                                </div>
+                            ) : (
+                                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {doctors.map((doctor) => (
+                                        <DoctorCard
+                                            key={doctor.did}
+                                            doctor={doctor}
+                                            onBookAppointment={handleBookAppointment}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </TabsContent>
+                    </Tabs>
                 </section>
             </main>
 

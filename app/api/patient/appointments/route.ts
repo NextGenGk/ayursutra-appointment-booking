@@ -18,37 +18,70 @@ export async function GET() {
 
         const supabase = createServerClient();
 
-        // Fetch patient's appointments with doctor details
-        const { data: appointments, error } = await supabase
+        // Fetch patient's appointments (without FK joins)
+        const { data: appointments, error: appointmentsError } = await supabase
             .from('appointments')
-            .select(`
-        *,
-        doctor:doctors!appointments_did_fkey (
-          *,
-          user:users!doctors_uid_fkey (
-            uid,
-            name,
-            email,
-            profile_image_url
-          )
-        )
-      `)
+            .select('*')
             .eq('pid', session.pid)
             .neq('status', 'completed')
             .order('scheduled_date', { ascending: true })
             .order('scheduled_time', { ascending: true });
 
-        if (error) {
-            console.error('Error fetching appointments:', error);
+        if (appointmentsError) {
+            console.error('Error fetching appointments:', appointmentsError);
             return NextResponse.json(
                 { success: false, error: 'Failed to fetch appointments' },
                 { status: 500 }
             );
         }
 
+        if (!appointments || appointments.length === 0) {
+            return NextResponse.json({
+                success: true,
+                data: [],
+            });
+        }
+
+        // Fetch doctor details for all appointments
+        const doctorIds = Array.from(new Set(appointments.map(apt => apt.did).filter(Boolean)));
+        
+        const { data: doctors, error: doctorsError } = await supabase
+            .from('doctors')
+            .select('did, uid, specialization, qualification, consultation_fee, bio, clinic_name, city, state, languages, is_verified')
+            .in('did', doctorIds);
+
+        if (doctorsError) {
+            console.error('Error fetching doctors:', doctorsError);
+        }
+
+        // Fetch user details for doctors
+        const doctorUids = doctors?.map(d => d.uid).filter(Boolean) || [];
+        const { data: users, error: usersError } = await supabase
+            .from('users')
+            .select('uid, name, email, profile_image_url')
+            .in('uid', doctorUids);
+
+        if (usersError) {
+            console.error('Error fetching users:', usersError);
+        }
+
+        // Manually join the data
+        const appointmentsWithDoctors = appointments.map(appointment => {
+            const doctor = doctors?.find(d => d.did === appointment.did);
+            const user = doctor ? users?.find(u => u.uid === doctor.uid) : null;
+            
+            return {
+                ...appointment,
+                doctor: doctor ? {
+                    ...doctor,
+                    user: user || null
+                } : null
+            };
+        });
+
         return NextResponse.json({
             success: true,
-            data: appointments || [],
+            data: appointmentsWithDoctors,
         });
     } catch (error) {
         console.error('Get patient appointments error:', error);
